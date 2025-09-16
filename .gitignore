@@ -1,0 +1,4 @@
+*.docx
+*.doc
+~$*.docx   # archivos temporales de Office
+~$*.doc
