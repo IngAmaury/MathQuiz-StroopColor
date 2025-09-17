@@ -40,7 +40,30 @@ python app.py
 - After the last image, the app shows “Fin de la prueba Stroop Color, Gracias por participar”.
 
 ## Configuration
-- Math problems: edit de **PROBLEMS** list.
+- Math problems: edit de **PROBLEMS** list, e.g:
+```python
+PROBLEMS = [
+    "25 + 37 =",
+    "120 – 48 =",
+    ...
+]
+```
+> [!WARNING]
+> Problem checking relies on _eval_expr() (below), which sanitizes symbols and auto-evaluates arithmetic expressions. If you add problems that can’t be auto-evaluated by this function, either extend _eval_expr() or disable auto-eval and provide ANSWERS manually.
+```python
+def _sanitize(expr: str) -> str:
+    return (expr.replace('×','*').replace('−','-').replace('–','-')
+                .replace(',','').replace('=',''))
+
+def _eval_expr(expr: str) -> int:
+    return int(eval(_sanitize(expr), {"__builtins__": None}, {}))
+
+# Default (auto-eval):
+ANSWERS = [_eval_expr(p) for p in PROBLEMS]
+
+# Manual fallback (remove/disable the line above and define 1:1 with PROBLEMS):
+# ANSWERS = [62, 72, 84, ...]
+```
 - Stroop trials (filename & duration): edit self.stroop_trials list, e.g.:
 ```python
 self.stroop_trials = [
@@ -49,6 +72,17 @@ self.stroop_trials = [
     ("3.png", 18),
 ]
 ```
-- Feedback font size / emojis: adjust the font used by the feedback Label. On Windows/Tk 8.6, color emojis in labels are limited.
-
+- Feedback font size / emojis: adjust the font used by the feedback Label, e.g.:
+```python
+self.feedback_lbl = ttk.Label(self.main_frame, textvariable=self.feedback_var,
+font=("Segoe UI", 14, "bold"))
+```
+> [!NOTE]
+> On Windows/Tk 8.6, color emojis in labels are limited.
+## Language 
+- Spanish-only UI. All labels, buttons, and feedback messages are in Spanish.
+- The Stroop Color stimuli/prompt flow is also presented in Spanish.
 ## License
+This project is licensed under the **MIT License**.  
+Copyright © 2025 Amaury Santiago Horta.
+See the [LICENSE](LICENSE) file for details.
