@@ -46,6 +46,8 @@ class MathQuiz(tk.Tk):
         self.title("Prueba de matemáticas")
         self.minsize(680, 300)
         self.current_idx = 0
+        self._advance_after_id = None
+        self._advance_locked = False
 
         # Base dir (misma carpeta del script)
         try:
@@ -76,7 +78,7 @@ class MathQuiz(tk.Tk):
 
         self.feedback_var = tk.StringVar(value="")
         self.feedback_lbl = ttk.Label(self.main_frame, textvariable=self.feedback_var,
-                                      font=("Segoe UI", 22, "bold"))
+                                      font=("Segoe UI Emoji", 22, "bold"))
 
         # Contador inferior derecho
         self.remaining_var = tk.StringVar(value="")
@@ -103,6 +105,15 @@ class MathQuiz(tk.Tk):
 
     def _validate_numeric(self, proposed: str) -> bool:
         return re.fullmatch(r"-?\d*", proposed) is not None
+    
+    def _cancel_pending_advance(self):
+        if self._advance_after_id is not None:
+            try:
+                self.after_cancel(self._advance_after_id)
+            except Exception:
+                pass
+            self._advance_after_id = None
+        self._advance_locked = False
 
     def start_quiz(self):
         self.start_btn.pack_forget()
@@ -128,6 +139,7 @@ class MathQuiz(tk.Tk):
         self.show_problem(0)
 
     def show_problem(self, idx: int):
+        self._cancel_pending_advance()
         self.current_idx = idx
         self.done_lbl.grid_forget()
         self.start_stroop_btn.grid_forget()
@@ -143,6 +155,9 @@ class MathQuiz(tk.Tk):
         self.remaining_var.set(f"Faltan: {remaining}")
 
     def on_entry_change(self, event=None):
+        if self._advance_locked:
+            return
+        
         text = self.answer_var.get()
         if text in ("", "-", "+"):
             self.feedback_var.set("")
@@ -150,18 +165,22 @@ class MathQuiz(tk.Tk):
         try:
             user_val = int(text)
         except ValueError:
-            self.feedback_var.set("Incorrecto ):")
+            self.feedback_var.set("Incorrecto 🙁")
             return
 
         correct = ANSWERS[self.current_idx]
         if user_val == correct:
             self.feedback_var.set("Correcto 🙂")
             self.answer_entry.state(["disabled"])
-            self.after(650, self.next_problem)
+            self._advance_locked = True
+            if self._advance_after_id is None:
+                self._advance_after_id = self.after(850, self.next_problem)
         else:
-            self.feedback_var.set("Incorrecto ):")
+            self.feedback_var.set("Incorrecto 🙁")
 
     def next_problem(self):
+        self._advance_after_id = None
+        self._advance_locked = False
         nxt = self.current_idx + 1
         if nxt >= len(PROBLEMS):
             # Fin del cuestionario
@@ -284,7 +303,7 @@ class MathQuiz(tk.Tk):
             # Mensaje final
             self.timer_var.set("")
             self.image_label.configure(image="", text="")
-            self.status_var.set("Fin de la prueba Stroop Color, Gracias por participar")
+            self.status_var.set("Fin de la prueba Stroop Color, Gracias por participar 😎🎉")
             self.next_trial_btn.grid_forget()
         else:
             self.show_stroop_trial(self.current_trial_idx)
