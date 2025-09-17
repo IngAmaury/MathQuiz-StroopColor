@@ -1,3 +1,92 @@
+"""
+============================================
+Math Quiz + Stroop Color (Spanish UI)
+============================================
+Autor: Amaury Santiago Horta
+Año: 2025
+Licencia: MIT (ver archivo LICENSE)
+
+Descripción
+-----------
+Aplicación de escritorio en Python/Tkinter que ejecuta primero un
+cuestionario de matemáticas con validación inmediata (solo avanza
+si la respuesta es correcta) y, al finalizar, inicia una secuencia
+tipo Stroop Color mostrando imágenes cronometradas con un contador
+visible y pantallas intermedias de “Fin de prueba X”.
+
+Funcionamiento
+--------------
+1. Pantalla inicial con botón **“iniciar”**.
+2. Se muestra una operación matemáticas y un cuadro de entrada numérica:
+   - Al escribir la respuesta correcta, aparece **“Correcto 🙂”** y
+     se avanza automáticamente al siguiente problema.
+   - Si es incorrecta, se muestra **“Incorrecto 🙁”** y se espera un
+     nuevo intento.
+   - Opción opcional: botón **“Terminar prueba”** o un **código secreto**
+     para saltar directamente al Stroop (útil en pruebas).
+3. Al completar el bloque de problemas aparece **“¡Completado !”** y el
+   botón **“Iniar Stroop”**.
+4. Secuencia Stroop:
+   - Muestra imágenes (p. ej., `1.webp`, `2.jpg`, `3.png`) durante un
+     tiempo determinado (15 s, 16 s, 18 s, etc.) con un contador visible.
+   - Al terminar cada imagen, aparece **“Fin de prueba X”** con un
+     botón **“siguiente”**.
+   - Al finalizar todas las imágenes, se muestra
+     **“Fin de la prueba Stroop Color, Gracias por participar”**.
+
+Clases y Métodos
+----------------
+- **MathQuiz (tk.Tk)**: Ventana principal y flujo de la app.
+  - `start_quiz()`: Inicializa el cuestionario.
+  - `show_problem(idx)`: Muestra el problema `idx`.
+  - `on_entry_change(event)`: Valida la entrada y gestiona el feedback.
+  - `next_problem()`: Avanza al siguiente problema de forma segura
+    (bloqueo/debounce para evitar saltos dobles).
+  - `finish_quiz_early()`: Termina el cuestionario y muestra los
+    controles para iniciar Stroop (opcional).
+  - `build_stroop_ui()`: Construye la UI del modo Stroop.
+  - `start_stroop()`: Inicia la secuencia Stroop.
+  - `show_stroop_trial(idx)`: Muestra la imagen y arranca el contador.
+  - `update_stroop_timer()`: Actualiza el tiempo restante por segundo.
+  - `next_stroop_trial()`: Avanza al siguiente estímulo o muestra
+    el mensaje final.
+  - `load_image(filename)`: Carga imágenes (WEBP/JPG/PNG) usando Pillow.
+
+Parámetros de Configuración
+---------------------------
+- **PROBLEMS**: Lista de strings con las operaciones aritméticas.
+- **Evaluación automática**:
+  - `_sanitize(expr)`: Normaliza símbolos (×, −, comas, =) antes de evaluar.
+  - `_eval_expr(expr)`: Evalúa expresiones aritméticas básicas en modo seguro.
+  - `ANSWERS = [_eval_expr(p) for p in PROBLEMS]`.
+  - Si incluyes problemas no evaluables automáticamente, desactiva esa línea
+    y define `ANSWERS` manualmente 1:1 con `PROBLEMS`.
+- **Trials de Stroop**: `self.stroop_trials = [(filename, dur_seg), ...]`.
+- **Atajo opcional**: `SKIP_CODE` para saltar del quiz a Stroop (p. ej., "00110011").
+- **Recursos**: Las imágenes se buscan en la misma carpeta del script.
+
+Ejemplo de Uso
+--------------
+Ejecutar el archivo principal:
+    python app.py
+
+Dependencias
+------------
+- **Python 3.8+**
+- **Tkinter**
+  - Windows/macOS: viene con la instalación oficial de Python.
+  - Linux: instalar vía sistema (p. ej., `sudo apt-get install python3-tk`).
+- **Pillow** (para abrir WEBP/JPG/PNG): `pip install pillow`
+
+Notas
+-----
+- En Windows con Tk 8.6 los emojis a color pueden no renderizarse;
+  se admite fallback con imágenes PNG para el feedback 🙂/🙁.
+- Para evitar “saltarse” problemas por eventos múltiples (`KeyRelease`/`Return`),
+  se usa un bloqueo y cancelación del `after()` al programar el avance.
+- Ajusta tamaños de fuente, textos en español y duraciones de Stroop
+  según tus necesidades.
+"""
 import tkinter as tk
 from tkinter import ttk
 import re
@@ -87,6 +176,10 @@ class MathQuiz(tk.Tk):
 
         self.done_lbl = ttk.Label(self.main_frame, text="¡Completado !",
                                   font=("Segoe UI", 16, "bold"))
+        
+        # Botón Terminar prueba (salto explícito a fin del quiz)
+        self.quit_quiz_btn = ttk.Button(self.main_frame, text="Terminar prueba",
+                                        command=self.finish_quiz_early)
 
         # Botón para iniciar Stroop al terminar el quiz
         self.start_stroop_btn = ttk.Button(self.main_frame, text="Iniar Stroop",
@@ -127,6 +220,8 @@ class MathQuiz(tk.Tk):
 
         self.feedback_lbl.grid(row=2, column=0, columnspan=2, pady=(10, 0), sticky="w")
 
+        self.quit_quiz_btn.grid(row=3, column=0, sticky="w", pady=(10, 0))
+
         # fila “elástica” para empujar el contador hacia abajo
         self.main_frame.rowconfigure(2, weight=1)
         # columnas sin expansión
@@ -137,6 +232,36 @@ class MathQuiz(tk.Tk):
         self.remaining_lbl.grid(row=3, column=1, sticky="se")
 
         self.show_problem(0)
+    
+    def finish_quiz_early(self):
+        """Termina el quiz y muestra '¡Completado !' + botón 'Iniar Stroop'."""
+        # Cancela cualquier avance programado
+        if hasattr(self, "_advance_after_id") and self._advance_after_id:
+            try:
+                self.after_cancel(self._advance_after_id)
+            except Exception:
+                pass
+            self._advance_after_id = None
+        if hasattr(self, "_advance_locked"):
+            self._advance_locked = False
+
+        # Oculta widgets del problema actual
+        try:
+            self.answer_entry.grid_remove()
+        except Exception:
+            pass
+        try:
+            self.problem_lbl.grid_remove()
+        except Exception:
+            pass
+
+        self.feedback_var.set("")
+        self.remaining_var.set("Faltan: 0")
+
+        # Muestra final del quiz + botón para Stroop
+        self.done_lbl.grid(row=1, column=0, columnspan=2, pady=(12, 8))
+        self.start_stroop_btn.grid(row=2, column=0, columnspan=2, pady=(6, 0))
+
 
     def show_problem(self, idx: int):
         self._cancel_pending_advance()

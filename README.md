@@ -1,7 +1,7 @@
-# Math Quiz + Stroop Color Test (Tkinter) — Spanish UI
+# 🧮 Math Quiz + 🎯 Stroop Color Test (Tkinter) — Spanish UI
 A lightweight desktop app built with Python and Tkinter that first runs a short Math Quiz (auto-validated numeric answers with “Correct 🙂 / Incorrect 🙁” feedback), and upon completion launches a timed Stroop Color sequence that displays images with a visible countdown and “Next” prompts between trials.
 
-## Features 
+## 🛠 Features 
 * Start → Math Quiz → Stroop flow in a single window.
 
 * Numeric-only input, instant validation, and progression only on correct answers.
@@ -12,14 +12,15 @@ A lightweight desktop app built with Python and Tkinter that first runs a short 
 
 * Simple to customize (problems list, image files, and per-trial durations).
 
-## Requirements
+## 📌 Requirements
 * Python 3.8+
 * Tkinter
 * Pillow for WEBP/JPG/PNG support:
 
-## Getting started 
+## ✨ Getting started 
 1. Place the script (app.py) and the images 1.webp, 2.jpg, 3.png in the same folder.
-2. Install requirements
+2. Install requirements.
+
 Create and activate a virtual environment, then install dependencies.
 **Windows / macOS**
 ```bash
@@ -31,14 +32,14 @@ source .venv/bin/activate
 
 pip install -r requirements.txt
 ```
-3. Run
+3. Run "app.py".
 
 ``` bash
 python app.py
 
 ```
 
-## Usage 
+## 📑 Usage 
 - Click "Iniciar" to begin the Math Quiz
 - Type your answer in the numeric box.
     - Correct → shows “Correct 🙂” and advances automatically.
@@ -50,7 +51,7 @@ python app.py
 
 - After the last image, the app shows “Fin de la prueba Stroop Color, Gracias por participar”.
 
-## Configuration
+## ⚙ Configuration
 - Math problems: edit de **PROBLEMS** list, e.g:
 ```python
 PROBLEMS = [
@@ -90,10 +91,10 @@ font=("Segoe UI", 14, "bold"))
 ```
 > [!NOTE]
 > On Windows/Tk 8.6, color emojis in labels are limited.
-## Language 
+## 📕 Language 
 - Spanish-only UI. All labels, buttons, and feedback messages are in Spanish.
 - The Stroop Color stimuli/prompt flow is also presented in Spanish.
-## License
+## 🧾 License
 This project is licensed under the **MIT License**.  
 Copyright © 2025 Amaury Santiago Horta.
 See the [LICENSE](LICENSE) file for details.
