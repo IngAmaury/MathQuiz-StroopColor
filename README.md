@@ -1,4 +1,4 @@
-# Math Quiz + Stroop Color Test (Tkinter) - — Spanish UI
+# Math Quiz + Stroop Color Test (Tkinter) — Spanish UI
 A lightweight desktop app built with Python and Tkinter that first runs a short Math Quiz (auto-validated numeric answers with “Correct 🙂 / Incorrect 🙁” feedback), and upon completion launches a timed Stroop Color sequence that displays images with a visible countdown and “Next” prompts between trials.
 
 ## Features 
@@ -19,7 +19,18 @@ A lightweight desktop app built with Python and Tkinter that first runs a short 
 
 ## Getting started 
 1. Place the script (app.py) and the images 1.webp, 2.jpg, 3.png in the same folder.
-2. Install Pillow (see above).
+2. Install requirements
+Create and activate a virtual environment, then install dependencies.
+**Windows / macOS**
+```bash
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS
+source .venv/bin/activate
+
+pip install -r requirements.txt
+```
 3. Run
 
 ``` bash
