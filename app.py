@@ -10,7 +10,9 @@ Descripción
 -----------
 Aplicación de escritorio en Python/Tkinter que ejecuta primero un
 cuestionario de matemáticas con validación inmediata (solo avanza
-si la respuesta es correcta) y, al finalizar, inicia una secuencia
+si la respuesta es correcta) se tiene un contador mostrado que 
+hace que se detenga cada dos minutos el cuestionario, permitiendo 
+avanzar cuando se ingresa reanudar, y, al finalizar, inicia una secuencia
 tipo Stroop Color mostrando imágenes cronometradas con un contador
 visible y pantallas intermedias de “Fin de prueba X”.
 
@@ -22,6 +24,11 @@ Funcionamiento
      se avanza automáticamente al siguiente problema.
    - Si es incorrecta, se muestra **“Incorrecto 🙁”** y se espera un
      nuevo intento.
+   - Se tiene un contador en pantalla de dos minutos, se puede contestar 
+     en estos dos minutos y una vez terminado el tiempo aparece un mensaje
+     "Detente", se tiene una pausa y al momento de presionar el botón de 
+     reanudar, se sigue con el cuestionario reiniciando el contador, así 
+     sucesivamente hasta terminar el cuestionario o saltar al stoop.
    - Opción opcional: botón **“Terminar prueba”** o un **código secreto**
      para saltar directamente al Stroop (útil en pruebas).
 3. Al completar el bloque de problemas aparece **“¡Completado !”** y el
@@ -38,6 +45,7 @@ Clases y Métodos
 ----------------
 - **MathQuiz (tk.Tk)**: Ventana principal y flujo de la app.
   - `start_quiz()`: Inicializa el cuestionario.
+  - `start_timer()`: Inicia y reinicia el temporizador en 2 minutos.
   - `show_problem(idx)`: Muestra el problema `idx`.
   - `on_entry_change(event)`: Valida la entrada y gestiona el feedback.
   - `next_problem()`: Avanza al siguiente problema de forma segura
@@ -87,7 +95,8 @@ Notas
 - Ajusta tamaños de fuente, textos en español y duraciones de Stroop
   según tus necesidades.
 """
-import tkinter as tk
+
+import tkinter as tk 
 from tkinter import ttk
 import re
 from pathlib import Path
@@ -138,7 +147,11 @@ class MathQuiz(tk.Tk):
         self._advance_after_id = None
         self._advance_locked = False
 
-        # Base dir (misma carpeta del script)
+        # Timer variables
+        self._timer_after_id = None
+        self._remaining_secs = 120  # 2 minutos
+        self._paused = False
+
         try:
             self.base_dir = Path(__file__).resolve().parent
         except NameError:
@@ -169,20 +182,27 @@ class MathQuiz(tk.Tk):
         self.feedback_lbl = ttk.Label(self.main_frame, textvariable=self.feedback_var,
                                       font=("Segoe UI Emoji", 22, "bold"))
 
-        # Contador inferior derecho
+        # Contador de ejercicios
         self.remaining_var = tk.StringVar(value="")
         self.remaining_lbl = ttk.Label(self.main_frame, textvariable=self.remaining_var,
                                        font=("Segoe UI", 10))
 
-        self.done_lbl = ttk.Label(self.main_frame, text="¡Completado !",
+        # Contador de tiempo
+        self.timer_var = tk.StringVar(value="Tiempo: 2:00")
+        self.timer_lbl = ttk.Label(self.main_frame, textvariable=self.timer_var,
+                                   font=("Segoe UI", 12, "bold"))
+
+        self.done_lbl = ttk.Label(self.main_frame, text="¡Completado!",
                                   font=("Segoe UI", 16, "bold"))
         
-        # Botón Terminar prueba (salto explícito a fin del quiz)
         self.quit_quiz_btn = ttk.Button(self.main_frame, text="Terminar prueba",
                                         command=self.finish_quiz_early)
 
-        # Botón para iniciar Stroop al terminar el quiz
-        self.start_stroop_btn = ttk.Button(self.main_frame, text="Iniar Stroop",
+        # Botón Reanudar (solo aparece al detenerse)
+        self.resume_btn = ttk.Button(self.main_frame, text="Reanudar", command=self.resume_timer)
+
+        # Botón Stroop
+        self.start_stroop_btn = ttk.Button(self.main_frame, text="Iniciar Stroop",
                                            command=self.start_stroop)
 
         # --- Stroop ---
@@ -196,6 +216,7 @@ class MathQuiz(tk.Tk):
         self._timer_after_id = None
         self._current_photo = None  # referencia para no perder la imagen
 
+
     def _validate_numeric(self, proposed: str) -> bool:
         return re.fullmatch(r"-?\d*", proposed) is not None
     
@@ -208,60 +229,68 @@ class MathQuiz(tk.Tk):
             self._advance_after_id = None
         self._advance_locked = False
 
+    # ---------------------- QUIZ ----------------------
     def start_quiz(self):
         self.start_btn.pack_forget()
         self.main_frame.pack(fill="both", expand=True, padx=16, pady=16)
 
         # Layout
-        self.header.grid(row=0, column=0, columnspan=2, pady=(0, 12))
-        # poco padding y SIN pesos para que no se separen
+        self.header.grid(row=0, column=0, columnspan=3, pady=(0, 12))
         self.problem_lbl.grid(row=1, column=0, sticky="w", padx=(0, 6))
-        self.answer_entry.grid(row=1, column=1, sticky="w", padx=(0, 0))
+        self.answer_entry.grid(row=1, column=1, sticky="w")
 
-        self.feedback_lbl.grid(row=2, column=0, columnspan=2, pady=(10, 0), sticky="w")
+        self.feedback_lbl.grid(row=2, column=0, columnspan=3, pady=(10, 0), sticky="w")
 
         self.quit_quiz_btn.grid(row=3, column=0, sticky="w", pady=(10, 0))
-
-        # fila “elástica” para empujar el contador hacia abajo
-        self.main_frame.rowconfigure(2, weight=1)
-        # columnas sin expansión
-        self.main_frame.columnconfigure(0, weight=0)
-        self.main_frame.columnconfigure(1, weight=0)
-
-        # Contador en esquina inferior derecha
-        self.remaining_lbl.grid(row=3, column=1, sticky="se")
+        self.remaining_lbl.grid(row=3, column=1, sticky="e")
+        self.timer_lbl.grid(row=3, column=2, sticky="e")
 
         self.show_problem(0)
-    
+        self.start_timer()
+
+    def start_timer(self):
+        """Inicia/reinicia el temporizador en 2 minutos."""
+        if self._timer_after_id:
+            self.after_cancel(self._timer_after_id)
+        self._remaining_secs = 120
+        self._paused = False
+        self._timer_tick()
+
+    def _timer_tick(self):
+        if self._paused:
+            return
+        mins, secs = divmod(self._remaining_secs, 60)
+        self.timer_var.set(f"Tiempo: {mins}:{secs:02d}")
+        if self._remaining_secs <= 0:
+            self.pause_quiz()
+            return
+        self._remaining_secs -= 1
+        self._timer_after_id = self.after(1000, self._timer_tick)
+
+    def pause_quiz(self):
+        self._paused = True
+        self.feedback_var.set("¡Detente!")
+        self.answer_entry.state(["disabled"])
+        self.resume_btn.grid(row=4, column=0, pady=(10, 0))
+
+    def resume_timer(self):
+        self.feedback_var.set("")
+        self.answer_entry.state(["!disabled"])
+        self.answer_entry.focus_set()
+        self.resume_btn.grid_remove()
+        self.start_timer()  # aquí reinicia el conteo a 2 min
+
     def finish_quiz_early(self):
-        """Termina el quiz y muestra '¡Completado !' + botón 'Iniar Stroop'."""
-        # Cancela cualquier avance programado
-        if hasattr(self, "_advance_after_id") and self._advance_after_id:
-            try:
-                self.after_cancel(self._advance_after_id)
-            except Exception:
-                pass
-            self._advance_after_id = None
-        if hasattr(self, "_advance_locked"):
-            self._advance_locked = False
-
-        # Oculta widgets del problema actual
-        try:
-            self.answer_entry.grid_remove()
-        except Exception:
-            pass
-        try:
-            self.problem_lbl.grid_remove()
-        except Exception:
-            pass
-
+        if self._timer_after_id:
+            self.after_cancel(self._timer_after_id)
+            self._timer_after_id = None
+        self.answer_entry.grid_remove()
+        self.problem_lbl.grid_remove()
         self.feedback_var.set("")
         self.remaining_var.set("Faltan: 0")
-
-        # Muestra final del quiz + botón para Stroop
-        self.done_lbl.grid(row=1, column=0, columnspan=2, pady=(12, 8))
-        self.start_stroop_btn.grid(row=2, column=0, columnspan=2, pady=(6, 0))
-
+        self.timer_var.set("")
+        self.done_lbl.grid(row=1, column=0, columnspan=3, pady=(12, 8))
+        self.start_stroop_btn.grid(row=2, column=0, columnspan=3, pady=(6, 0))
 
     def show_problem(self, idx: int):
         self._cancel_pending_advance()
@@ -280,9 +309,8 @@ class MathQuiz(tk.Tk):
         self.remaining_var.set(f"Faltan: {remaining}")
 
     def on_entry_change(self, event=None):
-        if self._advance_locked:
+        if self._advance_locked or self._paused:
             return
-        
         text = self.answer_var.get()
         if text in ("", "-", "+"):
             self.feedback_var.set("")
@@ -292,7 +320,6 @@ class MathQuiz(tk.Tk):
         except ValueError:
             self.feedback_var.set("Incorrecto 🙁")
             return
-
         correct = ANSWERS[self.current_idx]
         if user_val == correct:
             self.feedback_var.set("Correcto 🙂")
@@ -308,16 +335,7 @@ class MathQuiz(tk.Tk):
         self._advance_locked = False
         nxt = self.current_idx + 1
         if nxt >= len(PROBLEMS):
-            # Fin del cuestionario
-            self.problem_var.set("")
-            self.answer_var.set("")
-            self.feedback_var.set("")
-            self.answer_entry.grid_remove()
-            self.problem_lbl.grid_remove()
-            self.remaining_var.set("Faltan: 0")
-            self.done_lbl.grid(row=1, column=0, columnspan=2, pady=(12, 8))
-            # Muestra botón "Iniar Stroop"
-            self.start_stroop_btn.grid(row=2, column=0, columnspan=2, pady=(6, 0))
+            self.finish_quiz_early()
         else:
             self.show_problem(nxt)
 
@@ -372,7 +390,6 @@ class MathQuiz(tk.Tk):
             photo = ImageTk.PhotoImage(img)
             return photo
         else:
-            # Fallback limitado (solo PNG/GIF suelen funcionar sin Pillow)
             if path.suffix.lower() not in (".png", ".gif"):
                 raise RuntimeError(
                     f"Pillow no instalado: no puedo abrir {path.suffix.upper()}. "
@@ -381,7 +398,6 @@ class MathQuiz(tk.Tk):
             return tk.PhotoImage(file=str(path))
 
     def show_stroop_trial(self, idx: int):
-        # Cancela timer previo si existía
         if self._timer_after_id:
             self.after_cancel(self._timer_after_id)
             self._timer_after_id = None
@@ -391,7 +407,6 @@ class MathQuiz(tk.Tk):
 
         fname, duration = self.stroop_trials[idx]
 
-        # Carga y muestra la imagen
         try:
             self._current_photo = self.load_image(fname)
             self.image_label.configure(image=self._current_photo)
@@ -399,15 +414,12 @@ class MathQuiz(tk.Tk):
             self._current_photo = None
             self.image_label.configure(image="", text=str(e))
 
-        # Inicia contador
         self._remaining_secs = int(duration)
         self.update_stroop_timer()
 
     def update_stroop_timer(self):
         self.timer_var.set(f"Tiempo: {self._remaining_secs} s")
         if self._remaining_secs <= 0:
-            # Fin del trial
-            # Quita la imagen y muestra el mensaje + botón siguiente
             self.image_label.configure(image="", text="")
             fin_msg = f"Fin de prueba {self.current_trial_idx + 1}"
             self.status_var.set(fin_msg)
@@ -418,14 +430,12 @@ class MathQuiz(tk.Tk):
             self._timer_after_id = self.after(1000, self.update_stroop_timer)
 
     def next_stroop_trial(self):
-        # Cancela timer si por alguna razón sigue activo
         if self._timer_after_id:
             self.after_cancel(self._timer_after_id)
             self._timer_after_id = None
 
         self.current_trial_idx += 1
         if self.current_trial_idx >= len(self.stroop_trials):
-            # Mensaje final
             self.timer_var.set("")
             self.image_label.configure(image="", text="")
             self.status_var.set("Fin de la prueba Stroop Color, Gracias por participar 😎🎉")
