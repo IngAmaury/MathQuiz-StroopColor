@@ -3,6 +3,7 @@
 Math Quiz + Stroop Color (Spanish UI)
 ============================================
 Autor: Amaury Santiago Horta
+Collaborator: Karla Mariel Alcantar Dominguez
 Año: 2025
 Licencia: MIT (ver archivo LICENSE)
 
